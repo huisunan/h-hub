@@ -1,0 +1,90 @@
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+  --radius-full: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-instant: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  --blur-sm: 12px;
+  --blur-md: 24px;
+  --blur-lg: 40px;
+
+  --panel-rgb: 248 249 252;
+  --panel-alpha: 1;
+
+  --accent-blue: #68a0ff;
+  --accent-violet: #e8a1ff;
+  --accent-teal: #69ded3;
+  --accent-amber: #ffcf80;
+}
+
+[data-theme="light"] {
+  --bg-glass: rgba(248, 249, 252, 0.84);
+  --panel-rgb: 248 249 252;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-hover: rgba(255, 255, 255, 0.92);
+  --surface-active: rgba(255, 255, 255, 0.98);
+  --surface-sunken: rgba(20, 22, 26, 0.05);
+  --border: rgba(20, 22, 26, 0.08);
+  --border-strong: rgba(20, 22, 26, 0.14);
+  --border-highlight: rgba(255, 255, 255, 0.7);
+  --text-1: #14161a;
+  --text-2: #5b6270;
+  --text-3: #8a91a0;
+  --primary: #5b7cfa;
+  --primary-soft: rgba(91, 124, 250, 0.14);
+  --accent: #8b5cf6;
+  --danger: #f0524d;
+  --danger-soft: rgba(240, 82, 77, 0.14);
+  --success: #22b07d;
+  --shadow-e1: 0 1px 2px rgba(15, 20, 40, 0.08);
+  --shadow-e2: 0 8px 24px rgba(15, 20, 40, 0.12);
+  --shadow-e3: 0 24px 80px rgba(15, 20, 40, 0.22);
+  --scrim: rgba(15, 20, 40, 0.28);
+}
+
+[data-theme="dark"] {
+  --bg-glass: rgba(20, 22, 30, 0.88);
+  --panel-rgb: 20 22 30;
+  --surface: rgba(32, 36, 48, 0.72);
+  --surface-hover: rgba(48, 53, 70, 0.86);
+  --surface-active: rgba(58, 64, 84, 0.94);
+  --surface-sunken: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-highlight: rgba(255, 255, 255, 0.14);
+  --text-1: #f5f6fa;
+  --text-2: #a7adbc;
+  --text-3: #6f7686;
+  --primary: #7c93ff;
+  --primary-soft: rgba(124, 147, 255, 0.18);
+  --accent: #a78bfa;
+  --danger: #ff6b66;
+  --danger-soft: rgba(255, 107, 102, 0.16);
+  --success: #34d399;
+  --shadow-e1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-e2: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-e3: 0 24px 80px rgba(0, 0, 0, 0.6);
+  --scrim: rgba(0, 0, 0, 0.5);
+}
