@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { DEFAULT_CONFIG } from "../lib/config";
+import { DEFAULT_CONFIG, normalizeConfig } from "../lib/config";
 import type { HubConfig, ThemeMode } from "../lib/types";
 import { download } from "../lib/util";
 import { useHub } from "../state/useHub";
@@ -39,14 +39,7 @@ function Setting({ label, desc, children }: { label: string; desc?: string; chil
 }
 
 function sanitizeImported(parsed: Partial<HubConfig>): HubConfig {
-  return {
-    ...DEFAULT_CONFIG,
-    ...parsed,
-    bindings: {
-      app: { ...(parsed.bindings?.app ?? {}) },
-      action: { ...(parsed.bindings?.action ?? {}) },
-    },
-  };
+  return normalizeConfig(parsed);
 }
 
 export function SettingsView() {
@@ -141,6 +134,12 @@ export function SettingsView() {
             <Setting label="单实例运行" desc="重复启动时聚焦已有窗口（默认开启）">
               <span className="hh-tool-sub">已启用</span>
             </Setting>
+            <Setting label="诊断日志" desc="记录热键/焦点事件到临时目录（排查用）">
+              <Switch
+                on={config.diagnostics}
+                onChange={() => setConfig((current) => ({ ...current, diagnostics: !current.diagnostics }))}
+              />
+            </Setting>
           </>
         )}
 
@@ -217,6 +216,27 @@ export function SettingsView() {
                   setConfig((current) => ({ ...current, iconSize: Number(event.target.value) }))
                 }
               />
+            </Setting>
+            <Setting label="磨砂模糊" desc="亚克力/毛玻璃（Windows 上可能影响圆角表现）">
+              <Switch
+                on={config.frosted}
+                onChange={() => setConfig((current) => ({ ...current, frosted: !current.frosted }))}
+              />
+            </Setting>
+            <Setting label="键位页数" desc={`${config.pages} 页`}>
+              <select
+                value={config.pages}
+                onChange={(event) =>
+                  setConfig((current) => normalizeConfig({ ...current, pages: Number(event.target.value) }))
+                }
+                style={{ padding: "8px 12px", borderRadius: 12, background: "var(--surface)", border: "1px solid var(--border-strong)" }}
+              >
+                {[1, 2, 3, 4, 5, 6].map((value) => (
+                  <option key={value} value={value}>
+                    {value} 页
+                  </option>
+                ))}
+              </select>
             </Setting>
           </>
         )}

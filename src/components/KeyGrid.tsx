@@ -7,6 +7,7 @@ import { firstChar, gradientFor } from "../lib/util";
 import { useHub } from "../state/useHub";
 
 interface SlotProps {
+  slotCode: string;
   label: string;
   binding?: Binding;
   editMode: boolean;
@@ -23,6 +24,7 @@ interface SlotProps {
 }
 
 function Slot({
+  slotCode,
   label,
   binding,
   editMode,
@@ -60,6 +62,7 @@ function Slot({
   return (
     <div
       className="hh-slot"
+      data-slot={slotCode}
       data-empty={!binding}
       data-drag={dragging}
       data-drop={dropping}
@@ -107,6 +110,7 @@ function Slot({
 export function KeyGrid() {
   const mode = useHub((state) => state.mode);
   const config = useHub((state) => state.config);
+  const page = useHub((state) => state.page);
   const editMode = useHub((state) => state.editMode);
   const patch = useHub((state) => state.patch);
   const setBinding = useHub((state) => state.setBinding);
@@ -114,7 +118,7 @@ export function KeyGrid() {
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
 
-  const bindings = config.bindings[mode];
+  const bindings = config.bindings[mode][page[mode]] ?? {};
 
   const openPicker = (slot: string) => patch({ picker: { mode, slot } });
 
@@ -127,6 +131,7 @@ export function KeyGrid() {
             return (
               <Slot
                 key={slot.code}
+                slotCode={slot.code}
                 label={slot.label}
                 binding={binding}
                 editMode={editMode}

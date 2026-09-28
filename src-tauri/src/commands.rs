@@ -1,5 +1,20 @@
 use crate::model::{AppEntry, FileItem, PlatformInfo};
 use crate::platform;
+use base64::Engine;
+
+#[tauri::command]
+pub fn read_image(path: String) -> Option<String> {
+    platform::image_file_data_url(&path)
+}
+
+#[tauri::command]
+pub fn save_image_data_url(path: String, data_url: String) -> Result<(), String> {
+    let encoded = data_url.split(',').nth(1).unwrap_or("");
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|error| error.to_string())?;
+    std::fs::write(&path, bytes).map_err(|error| error.to_string())
+}
 
 #[tauri::command]
 pub fn platform_info() -> PlatformInfo {

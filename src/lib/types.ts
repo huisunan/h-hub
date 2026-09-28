@@ -21,7 +21,10 @@ export interface HubConfig {
   hideOnBlur: boolean;
   opacity: number;
   iconSize: number;
-  bindings: { app: SlotMap; action: SlotMap };
+  pages: number;
+  frosted: boolean;
+  diagnostics: boolean;
+  bindings: { app: SlotMap[]; action: SlotMap[] };
 }
 
 export interface AppEntry {

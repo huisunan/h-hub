@@ -1,5 +1,8 @@
 import { useEffect } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { listen } from "@tauri-apps/api/event";
+import { disable as disableAutostart, enable as enableAutostart, isEnabled as autostartEnabled } from "@tauri-apps/plugin-autostart";
 import { ContextMenu } from "./components/ContextMenu";
 import { ItemPicker } from "./components/ItemPicker";
 import { KeyGrid } from "./components/KeyGrid";
@@ -7,14 +10,15 @@ import { SearchView } from "./components/SearchView";
 import { SettingsView } from "./components/SettingsView";
 import { Toasts } from "./components/Toasts";
 import { TopBar } from "./components/TopBar";
+import { AnnotationTool } from "./components/tools/AnnotationTool";
 import { CalendarTool } from "./components/tools/CalendarTool";
 import { ClipboardTool } from "./components/tools/ClipboardTool";
 import { DraftTool } from "./components/tools/DraftTool";
 import { ImageConvertTool } from "./components/tools/ImageConvertTool";
 import { MarkdownTool } from "./components/tools/MarkdownTool";
 import {
+  applyAppearance,
   applyTheme,
-  applyTransparency,
   hideWindow,
   inShowGuard,
   launchBinding,
@@ -25,13 +29,35 @@ import {
   DEFAULT_CONFIG,
   loadAppsCache,
   loadConfig,
+  loadWindowState,
   saveAppsCache,
   saveConfig,
+  saveWindowState,
 } from "./lib/config";
 import { logDebug } from "./lib/debug";
 import { ipc } from "./lib/ipc";
 import { applyShortcuts } from "./lib/shortcuts";
 import { useHub } from "./state/useHub";
+
+function PageDots() {
+  const mode = useHub((state) => state.mode);
+  const pages = useHub((state) => state.config.pages);
+  const page = useHub((state) => state.page[mode]);
+  const setPage = useHub((state) => state.setPage);
+  if (pages <= 1) return null;
+  return (
+    <div className="hh-dots">
+      {Array.from({ length: pages }).map((_, index) => (
+        <i
+          key={index}
+          data-active={index === page}
+          style={{ cursor: "pointer" }}
+          onClick={() => setPage(mode, index)}
+        />
+      ))}
+    </div>
+  );
+}
 
 function Footer() {
   const view = useHub((state) => state.view);
@@ -43,6 +69,8 @@ function Footer() {
     return (
       <footer className="hh-footer">
         <span className="hh-hint">拖拽排序 · 点击空位添加 · 右键更多</span>
+        <div className="hh-spacer" />
+        <PageDots />
         <div className="hh-spacer" />
         <span className="hh-hint">
           <kbd>完成</kbd> 保存
@@ -60,6 +88,11 @@ function Footer() {
           <kbd>Space</kbd> 搜索
         </span>
         <div className="hh-spacer" />
+        <PageDots />
+        <div className="hh-spacer" />
+        <span className="hh-hint">
+          <kbd>PgUp/PgDn</kbd> 翻页
+        </span>
         <span className="hh-hint">
           <kbd>Tab</kbd> 主题
         </span>
@@ -131,7 +164,7 @@ export default function App() {
 
       patch({ platform, config: cfg, ready: true });
       applyTheme(cfg.theme);
-      void applyTransparency();
+      void applyAppearance();
 
       try {
         if (!localStorage.getItem("hhub-onboarded")) {
@@ -140,7 +173,7 @@ export default function App() {
           markShown();
           await window.show();
           await window.setFocus();
-          await applyTransparency();
+          await applyAppearance();
         }
       } catch {
         /* ignore */
@@ -222,7 +255,7 @@ export default function App() {
           void logDebug(`focus changed: ${focused}`);
           if (focused) {
             state.patch({ contextMenu: null });
-            void applyTransparency();
+            void applyAppearance();
             return;
           }
           if (inShowGuard()) {
@@ -268,9 +301,16 @@ export default function App() {
         }));
         return;
       }
+      if (event.key === "PageDown" || event.key === "PageUp") {
+        event.preventDefault();
+        const state = useHub.getState();
+        const delta = event.key === "PageDown" ? 1 : -1;
+        state.setPage(state.mode, state.page[state.mode] + delta);
+        return;
+      }
       if (event.code.startsWith("Key") || event.code.startsWith("Digit")) {
         const state = useHub.getState();
-        const binding = state.config.bindings[state.mode][event.code];
+        const binding = state.config.bindings[state.mode][state.page[state.mode]]?.[event.code];
         if (binding) {
           event.preventDefault();
           void launchBinding(binding);
@@ -280,6 +320,88 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [view, editMode, patch, setConfig]);
+
+  useEffect(() => {
+    void applyAppearance();
+  }, [config.frosted]);
+
+  useEffect(() => {
+    let unlistenMoved: (() => void) | undefined;
+    let unlistenDrop: (() => void) | undefined;
+    (async () => {
+      try {
+        const appWindow = getCurrentWindow();
+        const saved = await loadWindowState();
+        if (saved) await appWindow.setPosition(new PhysicalPosition(saved.x, saved.y));
+        unlistenMoved = await appWindow.onMoved(({ payload }) => {
+          void saveWindowState({ x: payload.x, y: payload.y });
+        });
+      } catch {
+        /* ignore */
+      }
+      try {
+        unlistenDrop = await getCurrentWebview().onDragDropEvent((event) => {
+          if (event.payload.type !== "drop") return;
+          const { paths, position } = event.payload;
+          if (paths.length === 0) return;
+          const ratio = window.devicePixelRatio || 1;
+          const element = document.elementFromPoint(
+            position.x / ratio,
+            position.y / ratio,
+          ) as HTMLElement | null;
+          const slot = element?.closest("[data-slot]") as HTMLElement | null;
+          const code = slot?.dataset.slot;
+          if (!code) return;
+          const path = paths[0];
+          const name = path.split(/[\\/]/).pop() ?? path;
+          const hub = useHub.getState();
+          hub.setBinding(hub.mode, code, { kind: "file", name, target: path });
+          hub.pushToast(`已绑定：${name}`);
+        });
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      unlistenMoved?.();
+      unlistenDrop?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let unlistenTheme: (() => void) | undefined;
+    let unlistenAutostart: (() => void) | undefined;
+    (async () => {
+      try {
+        unlistenTheme = await listen("hhub://toggle-theme", () => {
+          useHub.getState().setConfig((current) => ({
+            ...current,
+            theme: resolveTheme(current.theme) === "dark" ? "light" : "dark",
+          }));
+        });
+        unlistenAutostart = await listen("hhub://toggle-autostart", async () => {
+          const hub = useHub.getState();
+          try {
+            if (await autostartEnabled()) {
+              await disableAutostart();
+              hub.pushToast("已关闭开机自启");
+            } else {
+              await enableAutostart();
+              hub.pushToast("已开启开机自启");
+            }
+          } catch (error) {
+            hub.pushToast(String(error), "error");
+          }
+        });
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      unlistenTheme?.();
+      unlistenAutostart?.();
+    };
+  }, []);
 
   return (
     <div className="hh-root">
@@ -294,6 +416,7 @@ export default function App() {
           {view === "grid" && <KeyGrid />}
           {view === "search" && <SearchView />}
           {view === "settings" && <SettingsView />}
+          {view === "tool" && tool === "annotate" && <AnnotationTool />}
           {view === "tool" && tool === "clipboard" && <ClipboardTool />}
           {view === "tool" && tool === "calendar" && <CalendarTool />}
           {view === "tool" && tool === "imageConvert" && <ImageConvertTool />}

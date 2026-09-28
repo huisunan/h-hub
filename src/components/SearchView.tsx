@@ -60,8 +60,10 @@ export function SearchView() {
       pool.push(binding);
     };
 
-    for (const map of [bindings.action, bindings.app]) {
-      for (const binding of Object.values(map)) push(binding);
+    for (const pages of [bindings.action, bindings.app]) {
+      for (const map of pages) {
+        for (const binding of Object.values(map)) push(binding);
+      }
     }
     if (q) {
       for (const app of apps) {

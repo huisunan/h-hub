@@ -31,7 +31,12 @@ export function TopBar() {
   };
 
   const reset = () => {
-    if (window.confirm(`确定要清空「${mode === "action" ? "动作" : "应用"}」模式的所有绑定吗？`)) {
+    const pageLabel = useHub.getState().page[mode] + 1;
+    if (
+      window.confirm(
+        `确定要清空「${mode === "action" ? "动作" : "应用"}」第 ${pageLabel} 页的所有绑定吗？`,
+      )
+    ) {
       clearBindings(mode);
     }
   };

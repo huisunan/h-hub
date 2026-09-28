@@ -18,4 +18,7 @@ export const ipc = {
     format: string,
     quality?: number,
   ) => invoke<string[]>("convert_images", { inputs, outDir, format, quality }),
+  readImage: (path: string) => invoke<string | null>("read_image", { path }),
+  saveImageDataUrl: (path: string, dataUrl: string) =>
+    invoke<void>("save_image_data_url", { path, dataUrl }),
 };

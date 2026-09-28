@@ -14,6 +14,7 @@ const KINDS: { kind: PickerKind; label: string; icon: string }[] = [
 export function ContextMenu() {
   const menu = useHub((state) => state.contextMenu);
   const mode = useHub((state) => state.mode);
+  const page = useHub((state) => state.page);
   const config = useHub((state) => state.config);
   const patch = useHub((state) => state.patch);
   const setBinding = useHub((state) => state.setBinding);
@@ -36,7 +37,7 @@ export function ContextMenu() {
 
   if (!menu) return null;
 
-  const binding = config.bindings[mode][menu.slot];
+  const binding = config.bindings[mode][page[mode]]?.[menu.slot];
   const left = Math.min(menu.x, window.innerWidth - 210);
   const top = Math.min(menu.y, window.innerHeight - 300);
 

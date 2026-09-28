@@ -29,9 +29,17 @@ async function apply(config: HubConfig): Promise<void> {
   }
 
   if (config.directMode) {
+    const findBinding = (code: string) => {
+      for (const pages of [config.bindings.app, config.bindings.action]) {
+        for (const map of pages) {
+          if (map[code]) return map[code];
+        }
+      }
+      return undefined;
+    };
     let count = 0;
     for (const slot of ALL_SLOTS) {
-      const binding = config.bindings.app[slot.code] ?? config.bindings.action[slot.code];
+      const binding = findBinding(slot.code);
       if (!binding) continue;
       const accelerator = acceleratorFor(slot.code, config.modifier);
       if (!accelerator) continue;

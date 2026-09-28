@@ -10,11 +10,12 @@ export interface ToolDef {
 
 export const TOOLS: ToolDef[] = [
   { id: "screenshot", name: "截图", emoji: "✂️", color: "#8b5cf6", kind: "native" },
+  { id: "annotate", name: "标注", emoji: "🖊️", color: "#b48cff", kind: "view" },
   { id: "clipboard", name: "剪贴板", emoji: "📋", color: "#2fa8bd", kind: "view" },
   { id: "calendar", name: "日历", emoji: "📅", color: "#d99a3a", kind: "view" },
   { id: "imageConvert", name: "改图", emoji: "🖼️", color: "#e0834a", kind: "view" },
   { id: "markdown", name: "Markdown", emoji: "📝", color: "#4a90d9", kind: "view" },
-  { id: "draft", name: "草稿", emoji: "🗒️", color: "#9a6ce0", kind: "view" },
+  { id: "draft", name: "计算稿纸", emoji: "🧮", color: "#9a6ce0", kind: "view" },
   { id: "backDesktop", name: "回到桌面", emoji: "🖥️", color: "#2fa89a", kind: "native" },
   { id: "lock", name: "锁屏", emoji: "🔒", color: "#d96a5a", kind: "native" },
 ];
@@ -32,4 +33,5 @@ export const RECOMMENDED_ACTION_LAYOUT: Record<string, string> = {
   Digit6: "draft",
   Digit7: "backDesktop",
   Digit8: "lock",
+  Digit9: "annotate",
 };

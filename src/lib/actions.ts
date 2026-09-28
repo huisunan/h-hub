@@ -1,4 +1,4 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Effect, EffectState, getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ipc } from "./ipc";
 import { logDebug } from "./debug";
@@ -25,14 +25,29 @@ export function inShowGuard(): boolean {
 }
 
 /**
- * The native acrylic backdrop is dropped when the window is hidden on Windows.
- * Re-applying it on every show/focus keeps the glass effect consistent.
+ * Keeps the window looking right after it is shown/hidden:
+ * - the WebView2 background is made transparent (otherwise a gray backplate shows at the rounded corners)
+ * - optional frosted (acrylic) effect
  */
-export async function applyTransparency(): Promise<void> {
+export async function applyAppearance(): Promise<void> {
   try {
     await getCurrentWebview().setBackgroundColor([0, 0, 0, 0]);
   } catch (error) {
     await logDebug(`setBackgroundColor failed: ${String(error)}`);
+  }
+  try {
+    const window = getCurrentWindow();
+    if (useHub.getState().config.frosted) {
+      await window.setEffects({
+        effects: [Effect.Acrylic],
+        state: EffectState.Active,
+        radius: 30,
+      });
+    } else {
+      await window.clearEffects();
+    }
+  } catch (error) {
+    await logDebug(`effects failed: ${String(error)}`);
   }
 }
 
@@ -48,7 +63,7 @@ export async function toggleWindow(): Promise<void> {
       markShown();
       await window.show();
       await window.setFocus();
-      await applyTransparency();
+      await applyAppearance();
       await logDebug("window shown + focused");
     }
   } catch (error) {

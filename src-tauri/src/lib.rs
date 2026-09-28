@@ -5,7 +5,7 @@ mod platform;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager,
+    Emitter, Manager,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -17,8 +17,10 @@ fn show_main(app: &tauri::AppHandle) {
 
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "显示 h-hub", true, None::<&str>)?;
+    let theme = MenuItem::with_id(app, "theme", "切换浅色 / 深色", true, None::<&str>)?;
+    let autostart = MenuItem::with_id(app, "autostart", "切换开机自启", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &theme, &autostart, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .tooltip("h-hub")
@@ -26,6 +28,12 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main(app),
+            "theme" => {
+                let _ = app.emit("hhub://toggle-theme", ());
+            }
+            "autostart" => {
+                let _ = app.emit("hhub://toggle-autostart", ());
+            }
             "quit" => app.exit(0),
             _ => {}
         })
@@ -73,6 +81,8 @@ pub fn run() {
             commands::read_text_file,
             commands::write_text_file,
             commands::convert_images,
+            commands::read_image,
+            commands::save_image_data_url,
         ])
         .setup(|app| {
             build_tray(app)?;
