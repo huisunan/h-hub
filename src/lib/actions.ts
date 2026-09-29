@@ -88,6 +88,15 @@ export async function launchBinding(binding: Binding, options?: { close?: boolea
   const close = options?.close !== false;
 
   try {
+    if (binding.kind === "tool" && binding.target === "screenshot") {
+      try {
+        await ipc.startCapture();
+      } catch (error) {
+        hub.pushToast(String(error), "error");
+      }
+      return;
+    }
+
     if (binding.kind === "tool") {
       const tool = TOOL_BY_ID[binding.target];
       if (!tool) {

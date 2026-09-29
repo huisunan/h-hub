@@ -188,6 +188,50 @@ pub fn icon_data_url(path: &str) -> Option<String> {
     crate::platform::image_file_data_url(path)
 }
 
+/// Capture the primary display to a PNG file and return its path.
+pub fn capture_primary_display_to_file() -> Result<String, String> {
+    let temp = std::env::temp_dir().join(format!(
+        "hhub-capture-{}-{}.png",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    ));
+    let path = temp.to_string_lossy().to_string();
+
+    let attempts: Vec<(&str, Vec<String>)> = vec![
+        ("grim", vec![path.clone()]),
+        ("gnome-screenshot", vec!["-f".into(), path.clone()]),
+        (
+            "import",
+            vec!["-window".into(), "root".into(), path.clone()],
+        ),
+        (
+            "spectacle",
+            vec!["-b".into(), "-n".into(), "-o".into(), path.clone()],
+        ),
+    ];
+
+    let mut last_error =
+        String::from("未找到可用的截图工具（grim / gnome-screenshot / import / spectacle）");
+    for (program, args) in attempts {
+        let _ = std::fs::remove_file(&temp);
+        match Command::new(program).args(&args).status() {
+            Ok(status) if status.success() && temp.exists() => return Ok(path),
+            Ok(status) => {
+                last_error = format!("{program} 退出码：{status}");
+            }
+            Err(error) => {
+                last_error = format!("{program}：{error}");
+            }
+        }
+    }
+
+    let _ = std::fs::remove_file(&temp);
+    Err(last_error)
+}
+
 pub fn run_action(id: &str) -> Result<(), String> {
     let spawn = |program: &str, args: &[&str]| -> Result<(), String> {
         Command::new(program)

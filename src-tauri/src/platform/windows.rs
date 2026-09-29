@@ -231,6 +231,90 @@ unsafe fn hicon_to_png(hicon: windows::Win32::UI::WindowsAndMessaging::HICON) ->
     crate::platform::encode_rgba_png(width as u32, height as u32, rgba)
 }
 
+/// Capture the primary display with GDI BitBlt and write it to a PNG file,
+/// returning the file path.
+pub fn capture_primary_display_to_file() -> Result<String, String> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Gdi::{
+        BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC,
+        GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, HGDIOBJ,
+        SRCCOPY,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+
+    unsafe {
+        let width = GetSystemMetrics(SM_CXSCREEN);
+        let height = GetSystemMetrics(SM_CYSCREEN);
+        if width <= 0 || height <= 0 {
+            return Err("无法获取屏幕尺寸".to_string());
+        }
+
+        let screen_dc = GetDC(HWND(std::ptr::null_mut()));
+        if screen_dc.is_invalid() {
+            return Err("无法获取屏幕 DC".to_string());
+        }
+        let mem_dc = CreateCompatibleDC(screen_dc);
+        let bitmap = CreateCompatibleBitmap(screen_dc, width, height);
+        let previous = SelectObject(mem_dc, HGDIOBJ(bitmap.0));
+
+        let blit = BitBlt(mem_dc, 0, 0, width, height, screen_dc, 0, 0, SRCCOPY);
+
+        let mut bmi = BITMAPINFO::default();
+        bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+        bmi.bmiHeader.biWidth = width;
+        bmi.bmiHeader.biHeight = -height;
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = 0;
+
+        let mut buffer = vec![0u8; (width as usize) * (height as usize) * 4];
+        let lines = GetDIBits(
+            mem_dc,
+            bitmap,
+            0,
+            height as u32,
+            Some(buffer.as_mut_ptr() as *mut std::ffi::c_void),
+            &mut bmi,
+            DIB_RGB_COLORS,
+        );
+
+        SelectObject(mem_dc, previous);
+        let _ = DeleteObject(HGDIOBJ(bitmap.0));
+        let _ = DeleteDC(mem_dc);
+        let _ = ReleaseDC(HWND(std::ptr::null_mut()), screen_dc);
+
+        blit.map_err(|error| error.to_string())?;
+        if lines == 0 {
+            return Err("截图失败".to_string());
+        }
+
+        let has_alpha = buffer.chunks_exact(4).any(|px| px[3] != 0);
+        let mut rgba = vec![0u8; buffer.len()];
+        for (src, dst) in buffer.chunks_exact(4).zip(rgba.chunks_exact_mut(4)) {
+            dst[0] = src[2];
+            dst[1] = src[1];
+            dst[2] = src[0];
+            dst[3] = if has_alpha { src[3] } else { 255 };
+        }
+
+        let image = image::RgbaImage::from_raw(width as u32, height as u32, rgba)
+            .ok_or_else(|| "图像缓冲无效".to_string())?;
+
+        let temp = std::env::temp_dir().join(format!(
+            "hhub-capture-{}-{}.png",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0)
+        ));
+        image::DynamicImage::ImageRgba8(image)
+            .save(&temp)
+            .map_err(|error| error.to_string())?;
+        Ok(temp.to_string_lossy().to_string())
+    }
+}
+
 pub fn run_action(id: &str) -> Result<(), String> {
     let spawn = |program: &str, args: &[&str]| -> Result<(), String> {
         Command::new(program)

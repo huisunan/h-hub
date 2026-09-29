@@ -1,6 +1,10 @@
+mod capture;
 mod commands;
+mod export;
 mod model;
+mod pin;
 mod platform;
+mod window_list;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -57,7 +61,8 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main(app);
         }))
@@ -70,7 +75,18 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
-        ))
+        ));
+
+    // tauri-nspanel must be registered before any window is converted to a panel.
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    builder
+        .manage(capture::CaptureState::default())
+        .manage(capture::WindowsState::default())
+        .manage(pin::PinState::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform_info,
             commands::scan_apps,
@@ -82,7 +98,15 @@ pub fn run() {
             commands::write_text_file,
             commands::convert_images,
             commands::read_image,
-            commands::save_image_data_url,
+            export::clipboard_write_image,
+            export::save_rgba_png,
+            capture::start_capture,
+            capture::capture_frame_bytes,
+            capture::capture_windows,
+            capture::reveal_capture,
+            capture::dispose_capture,
+            pin::pin_image_rgba,
+            pin::take_pin_image,
         ])
         .setup(|app| {
             build_tray(app)?;

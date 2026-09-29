@@ -51,6 +51,10 @@ windows = { version = "0.58", features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 icns = "0.3"
+tauri-nspanel = "2.1"
+core-graphics = "0.25"
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

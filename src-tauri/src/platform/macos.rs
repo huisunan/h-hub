@@ -135,6 +135,39 @@ fn app_icon(app: &Path) -> Option<String> {
     result
 }
 
+/// Capture the primary display straight to a PNG file and return its path.
+/// Requires the Screen Recording permission; `screencapture` fails or returns a
+/// blank frame when it has not been granted.
+pub fn capture_primary_display_to_file() -> Result<String, String> {
+    let temp = std::env::temp_dir().join(format!(
+        "hhub-capture-{}-{}.png",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    ));
+
+    let output = Command::new("screencapture")
+        .args(["-x", "-m", "-t", "png"])
+        .arg(&temp)
+        .output()
+        .map_err(|error| format!("无法运行 screencapture：{error}"))?;
+
+    if !output.status.success() {
+        let _ = std::fs::remove_file(&temp);
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let hint = "请到「系统设置 → 隐私与安全性 → 屏幕录制」授权后重试";
+        return Err(if stderr.is_empty() {
+            format!("截图失败，{hint}")
+        } else {
+            format!("{stderr}（{hint}）")
+        });
+    }
+
+    Ok(temp.to_string_lossy().to_string())
+}
+
 pub fn run_action(id: &str) -> Result<(), String> {
     let spawn = |program: &str, args: &[&str]| -> Result<(), String> {
         Command::new(program)

@@ -3,16 +3,8 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { readImage } from "@tauri-apps/plugin-clipboard-manager";
 import { ipc } from "../../lib/ipc";
 import { useHub } from "../../state/useHub";
-
-type Tool = "arrow" | "line" | "rect" | "ellipse" | "pen" | "highlight" | "mosaic" | "text";
-
-interface Annotation {
-  tool: Tool;
-  color: string;
-  width: number;
-  points: [number, number][];
-  text?: string;
-}
+import { COLORS, WIDTHS, drawAnnotation, type Annotation, type Tool } from "../../lib/annotate";
+import { rgbaBody, rgbaBodyWithPath } from "../../lib/rgba";
 
 const TOOLS: { id: Tool; label: string }[] = [
   { id: "arrow", label: "箭头" },
@@ -23,100 +15,8 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: "highlight", label: "高亮" },
   { id: "mosaic", label: "马赛克" },
   { id: "text", label: "文字" },
+  { id: "number", label: "序号" },
 ];
-
-const COLORS = ["#ff4d4f", "#ffb020", "#22b07d", "#3b82f6", "#8b5cf6", "#14161a", "#ffffff"];
-const WIDTHS = [2, 4, 7];
-
-function drawAnnotation(
-  ctx: CanvasRenderingContext2D,
-  base: HTMLImageElement,
-  ann: Annotation,
-): void {
-  const [start, end] = [ann.points[0], ann.points[ann.points.length - 1]];
-  ctx.save();
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.strokeStyle = ann.color;
-  ctx.fillStyle = ann.color;
-  ctx.lineWidth = ann.width;
-
-  switch (ann.tool) {
-    case "arrow": {
-      ctx.beginPath();
-      ctx.moveTo(start[0], start[1]);
-      ctx.lineTo(end[0], end[1]);
-      ctx.stroke();
-      const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
-      const size = 10 + ann.width * 2;
-      ctx.beginPath();
-      ctx.moveTo(end[0], end[1]);
-      ctx.lineTo(end[0] - size * Math.cos(angle - Math.PI / 7), end[1] - size * Math.sin(angle - Math.PI / 7));
-      ctx.lineTo(end[0] - size * Math.cos(angle + Math.PI / 7), end[1] - size * Math.sin(angle + Math.PI / 7));
-      ctx.closePath();
-      ctx.fill();
-      break;
-    }
-    case "line": {
-      ctx.beginPath();
-      ctx.moveTo(start[0], start[1]);
-      ctx.lineTo(end[0], end[1]);
-      ctx.stroke();
-      break;
-    }
-    case "rect": {
-      ctx.strokeRect(start[0], start[1], end[0] - start[0], end[1] - start[1]);
-      break;
-    }
-    case "ellipse": {
-      const cx = (start[0] + end[0]) / 2;
-      const cy = (start[1] + end[1]) / 2;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, Math.abs(end[0] - start[0]) / 2, Math.abs(end[1] - start[1]) / 2, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      break;
-    }
-    case "pen":
-    case "highlight": {
-      ctx.globalAlpha = ann.tool === "highlight" ? 0.35 : 1;
-      ctx.lineWidth = ann.tool === "highlight" ? ann.width * 3 : ann.width;
-      ctx.beginPath();
-      ann.points.forEach((point, index) => {
-        if (index === 0) ctx.moveTo(point[0], point[1]);
-        else ctx.lineTo(point[0], point[1]);
-      });
-      ctx.stroke();
-      break;
-    }
-    case "mosaic": {
-      const x = Math.min(start[0], end[0]);
-      const y = Math.min(start[1], end[1]);
-      const w = Math.abs(end[0] - start[0]);
-      const h = Math.abs(end[1] - start[1]);
-      if (w < 2 || h < 2) break;
-      const block = 10;
-      const tw = Math.max(1, Math.floor(w / block));
-      const th = Math.max(1, Math.floor(h / block));
-      const off = document.createElement("canvas");
-      off.width = tw;
-      off.height = th;
-      const octx = off.getContext("2d");
-      if (octx) {
-        octx.drawImage(base, x, y, w, h, 0, 0, tw, th);
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(off, x, y, w, h);
-      }
-      break;
-    }
-    case "text": {
-      ctx.font = `${12 + ann.width * 5}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.textBaseline = "top";
-      ctx.fillText(ann.text ?? "", start[0], start[1]);
-      break;
-    }
-  }
-  ctx.restore();
-}
 
 export function AnnotationTool() {
   const pushToast = useHub((state) => state.pushToast);
@@ -196,6 +96,20 @@ export function AnnotationTool() {
     }
   };
 
+  const copyImage = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !baseRef.current) {
+      pushToast("请先打开图片", "error");
+      return;
+    }
+    try {
+      await ipc.clipboardWriteImage(rgbaBody(canvas));
+      pushToast("已复制到剪贴板");
+    } catch (error) {
+      pushToast(String(error), "error");
+    }
+  };
+
   const saveImage = async () => {
     const canvas = canvasRef.current;
     if (!canvas || !baseRef.current) {
@@ -208,7 +122,7 @@ export function AnnotationTool() {
         filters: [{ name: "PNG", extensions: ["png"] }],
       });
       if (typeof selected !== "string") return;
-      await ipc.saveImageDataUrl(selected, canvas.toDataURL("image/png"));
+      await ipc.saveRgbaPng(rgbaBodyWithPath(canvas, selected));
       pushToast("已保存");
     } catch (error) {
       pushToast(String(error), "error");
@@ -229,6 +143,19 @@ export function AnnotationTool() {
     if (tool === "text") {
       const text = window.prompt("输入文字");
       if (text) setAnnotations((prev) => [...prev, { tool, color, width, points: [p], text }]);
+      return;
+    }
+    if (tool === "number") {
+      setAnnotations((prev) => [
+        ...prev,
+        {
+          tool,
+          color,
+          width,
+          points: [p],
+          text: String(prev.filter((item) => item.tool === "number").length + 1),
+        },
+      ]);
       return;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -296,6 +223,9 @@ export function AnnotationTool() {
         </button>
         <button className="hh-btn" onClick={() => setAnnotations([])}>
           清空
+        </button>
+        <button className="hh-btn" onClick={() => void copyImage()}>
+          复制
         </button>
         <button className="hh-btn" data-variant="primary" onClick={() => void saveImage()}>
           保存
